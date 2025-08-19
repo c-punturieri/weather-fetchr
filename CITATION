@@ -1,0 +1,10 @@
+citHeader("To cite this repository, please use:")
+
+citEntry(
+  entry = "Manual",
+  title = "Weather FetchR: Pulling NOAA Weather Data for GPS Observations",
+  author = person("Claire Emilia", "Punturieri"),
+  year = "2025",
+  note = "https://github.com/c-punturieri/weather-fetchr",
+  key = "WeatherFetchR2025"
+)

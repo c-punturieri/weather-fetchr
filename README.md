@@ -34,10 +34,16 @@ Coordinates (latitude, longitude) and a list of NOAA stations (which can be deri
  - Snow, snow depth, and precipitation are all denoted *by default* in **inches**
 
 
-## Example Usage
+## Tutorial
+
+Read the full tutorial here:  
+[Weather FetchR Tutorial](https://c-punturieri.github.io/weather-fetchr/tutorial)
 
 
 ## Citation
 
-If you use this code, please cite it as described in [CITATION.cff](./CITATION.cff).
+If you use this package or repository, please cite it as:
+
+Claire Emilia Punturieri (2025). *Weather FetchR: Pulling NOAA Weather Data for GPS Observations*. GitHub repository. <https://github.com/c-punturieri/weather-fetchr>
+
 
