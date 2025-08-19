@@ -58,8 +58,7 @@ fisher_longest <- fisher$day_label |>
                                                    lat_col = "lat", lon_col = "lon",
                                                    duration_col = "duration")) |>
   list_rbind() |> 
-  distinct(day_label, .keep_all = TRUE) #|> 
-  #select(-day_label)
+  distinct(day_label, .keep_all = TRUE)
 
 fisher_longest |> glimpse()
 ```

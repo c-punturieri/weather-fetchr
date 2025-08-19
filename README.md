@@ -33,6 +33,10 @@ Coordinates (latitude, longitude) and a list of NOAA stations (which can be deri
  - All temperatures are denoted *by default* in **Fahrenheit**
  - Snow, snow depth, and precipitation are all denoted *by default* in **inches**
 
+## Requirements
+
+This repository uses the tidyverse (2.0.0), lubridate (1.9.3), future (1.33.2), and geosphere (1.5.18) packages.
+It was built under R version 4.4.1.
 
 ## Tutorial
 
@@ -42,7 +46,7 @@ Read the full tutorial here:
 
 ## Citation
 
-If you use this package or repository, please cite it as:
+If you use this repository, please cite it as:
 
 Claire Emilia Punturieri (2025). *Weather FetchR: Pulling NOAA Weather Data for GPS Observations*. GitHub repository. <https://github.com/c-punturieri/weather-fetchr>
 
