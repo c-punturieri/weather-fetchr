@@ -1,0 +1,132 @@
+---
+title: "Weather fetchR example"
+author: "Claire Punturieri"
+date: "`r lubridate::today()`"
+format: 
+  html:
+    toc: true
+    toc_depth: 4
+    embed-resources: true
+editor_options: 
+  chunk_output_type: console
+---
+## Introduction
+
+This Quarto document provides a walkthrough for using the associated weather fetchR functions. The goal is to take movement data (lat/lon + time), identify where the subject spent the most time each day, find the nearest NOAA weather stations, and pull daily weather data for those locations.
+
+## Set-Up
+
+Load in dependencies and necessary functions.
+```{r}
+library(tidyverse)
+library(lubridate)
+library(future)
+
+source(here::here("functions/get_top_locations.R"))
+source(here::here("functions/identify_stations.R"))
+source(here::here("functions/pull_weather.R"))
+```
+
+We will be using example data adapted from a study on [movement data collected from fishers](https://datarepository.movebank.org/entities/datapackage/8d40ab81-1f34-4280-b6be-91e6b9fc3fcd) (original data can be accessed at: https://r-packages.io/datasets/leroy).
+
+These data have been simplified and slightly altered for the purposes of demonstrating pulling weather data.
+
+To set up, let's load in and take a look at the data.
+```{r}
+fisher <- read_csv(here::here("tutorial/data/pennanti_abridged.csv"),
+                   show_col_types = FALSE) |> 
+  glimpse()
+```
+
+## Calculating locations where the most time was spent - get_top_locations()
+
+To examine a broader area of space, you can round your latitude-longitude coordinates. One decimal place covers the space of about ~11km. Because this code makes external queries, when working with real participant data, using a wider area might afford greater anonymity/privacy.
+```{r}
+fisher <- fisher |>
+  mutate(lat = round(lat, 1),
+         lon = round(lon, 1))
+
+fisher |> glimpse()
+```
+
+Once you've completed that (optional) step, you can first get your subject's top locations.
+```{r}
+fisher_longest <- fisher$day_label |>
+  unique() |>
+  furrr::future_map(\(day_label_value) get_top_locations(data = fisher, day_label_value,
+                                                   day_col = "day_label",
+                                                   lat_col = "lat", lon_col = "lon",
+                                                   duration_col = "duration")) |>
+  list_rbind() |> 
+  distinct(day_label, .keep_all = TRUE) #|> 
+  #select(-day_label)
+
+fisher_longest |> glimpse()
+```
+
+## Getting corresponding weather stations - identify_stations()
+
+Next, you'll need to pull a list of stations. There are different ways that this can be done (you might already be hosting these files locally), but you can easily download codes for all NOAA stations by country using the `NOAA_countryStations()` function in the [FluMoDL package](https://github.com/thlytras/FluMoDL). To pull stations during a relevant time period, I recommend searching on study dates.
+```{r}
+first_date <- fisher_longest |>
+  arrange(date) |>
+  mutate(first_date = first(date)) |>
+  pull(first_date) |>
+  unique()
+
+last_date <- fisher_longest |>
+  arrange(date) |>
+  mutate(last_date = last(date)) |>
+  pull(last_date) |>
+  unique()
+
+weather_stns <- rbind(FluMoDL::NOAA_countryStations(fips = "US",
+                                                    from = first_date - 1, to = last_date + 1))
+
+weather_stns |> head()
+```
+
+As a side note should you opt to download these date via FluMoDL, all WBANs should be five digits. If a WBAN is not five digits, we should append one or two 0s to the beginning of the WBAN. We also need to ensure that blank rows in the ICAO column are set to NA for later filtering purposes.
+```{r}
+weather_stns <- weather_stns |> 
+  mutate(wban = ifelse(nchar(wban) == 3, paste0(00, wban), wban),
+         wban = ifelse(nchar(wban) == 4, paste0(0, wban), wban),
+         icao = na_if(icao, ""))
+```
+
+Once you have a list of relevant stations, you can then apply the `identify_stations()` function. Distance is automatically calculated in **meters**. A benefit of pulling more than one station is not every location registered as a station collects conventional weather data -- sometimes you might be pinging a buoy or a given station might not have weather for whatever reason. This will help you have less missing data later on (you could consider pulling the closest station with accurate data, or averaging across multiple stations).
+```{r}
+match_stns <- fisher_longest$day_label |>
+  unique() |>
+  furrr::future_map(\(day_label_value) identify_stations(data = fisher_longest,
+                                                         stations = weather_stns,
+                                                         day_label_value,
+                                                         n_stn = 5)) |>
+  purrr::map_dfr(~ tibble(subid = .x$subid, day_label = .x$day_label, wban = .x$wban,
+                              icao = .x$icao, distance = .x$distance, date = .x$date)) |>
+  mutate(obs_label = 1:n())
+
+match_stns |> head()
+```
+
+## Get weather data per day - pull_weather()
+
+We have matched each point where our participant spent the most time on each day on study to the closest weather station. We can now make direct queries to get weather data! When we do this, you can see that there are a lot of NAs. It is not unusual if some of the requested elements (like snow or precipitation) are sparse.
+```{r}
+weather <- match_stns$obs_label |>
+  unique() |>
+  furrr::future_map(\(obs_label_value) pull_weather(obs_label_value,
+                                                    data = match_stns)) |> 
+  bind_rows()
+
+weather |> glimpse()
+```
+
+Here's a simple average to summarize across the five nearest stations for each point. You might consider doing something more sophisticated (like a weighted mean).
+```{r}
+weather <- weather |> 
+  group_by(subid, date) |> 
+  summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)), .groups = "drop")
+
+weather |> glimpse()
+```
